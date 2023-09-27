@@ -1,0 +1,22 @@
+ae:
+  _target_: ddsp.ae.AutoEncoder
+  encoder:
+    _target_: ddsp.encoder.CentVolEncoder
+  decoder:
+    _target_: ddsp.decoder.DDSPNoiseBandDecoder
+    latent_dim: 64
+    hidden_size: 512
+    frame_rate: ${data.frame_rate}
+    n_banks: 1024
+    sample_rate: ${sample_rate}
+    attenuation_db: 30
+    n_splits: 32
+  latent_size: 64
+
+lr: 1e-4
+sample_rate: ${sample_rate}
+betas: [0.8, 0.99]
+lr_decay_steps: 10000
+lr_decay_factor: 0.5
+# freeze encoder after this many steps
+enc_freeze: null

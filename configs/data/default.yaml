@@ -1,0 +1,23 @@
+_target_: ddsp.data.SmallDataset
+
+raw_path: null
+sample_rate: ${sample_rate}
+length: 1.0
+frame_rate: 200
+dataset_size: 6400
+feat_proc:
+  _target_: ddsp.features.FeatureProcessor
+  features:
+    centroid:
+      _target_: ddsp.features.SpectralCentroid
+      sample_rate: ${sample_rate}
+      window_size: 1024
+      frame_rate: ${data.frame_rate}
+      center: True
+      n_fft: 1024
+    volume:
+      _target_: ddsp.features.Volume
+      sample_rate: ${sample_rate}
+      window_size: 1024
+      frame_rate: ${data.frame_rate}
+      center: True

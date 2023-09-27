@@ -1,0 +1,12 @@
+nnaudio
+hydra-core
+lightning
+lmdb
+tensorboard
+scipy
+matplotlib
+
+# remove this line if installing on Mac
+--extra-index-url https://download.pytorch.org/whl/cu117
+torch==1.13.1
+torchaudio==0.13.1
