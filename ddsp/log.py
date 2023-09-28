@@ -85,7 +85,7 @@ def save_to_board(
 
 
 class AudioLogger(Callback):
-    def __init__(self, batch_frequency=20000, sr=16000):
+    def __init__(self, batch_frequency=5000, sr=16000):
         super().__init__()
         self.batch_freq = batch_frequency
         self.sr = sr
@@ -121,11 +121,6 @@ class AudioLogger(Callback):
         )
         if is_train:
             pl_module.train()
-
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        # multiple optimizers result in global_steps+=2 every step
-        if pl_module.global_step % self.batch_freq in [0, 1]:
-            self.log_audio(pl_module, batch, name="train")
 
     def on_validation_batch_end(
         self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0

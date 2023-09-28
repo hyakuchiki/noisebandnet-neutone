@@ -16,8 +16,8 @@ seed: 0
 num_workers: 8
 ckpt: null # Used for resuming from checkpoint
 xfer_dir: assets/
-save_last: false
-save_every_n_min: 360 # keep a checkpoint every 6 hours
+save_last: true
+save_every_n_min: 30
 save_every_n_steps: null
 monitor_fad: false
 

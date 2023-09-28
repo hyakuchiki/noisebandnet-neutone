@@ -7,6 +7,7 @@ from ddsp.modules.reverb import IRReverb
 from ddsp.modules.noise import FilteredNoise
 from ddsp.modules.noiseband import NoiseBand
 from ddsp.util import exp_sigmoid
+from ddsp.stream import StatefulGRU
 
 
 class DDSPFiltNoiseDecoder(nn.Module):
@@ -14,7 +15,7 @@ class DDSPFiltNoiseDecoder(nn.Module):
         super().__init__()
         # control encoder
         self.mlp_0 = MLP(latent_dim, hidden_size)
-        self.gru = nn.GRU(hidden_size, hidden_size, batch_first=True)
+        self.gru = StatefulGRU(hidden_size, hidden_size)
         self.mlp_1 = MLP(hidden_size, hidden_size)
         n_freqs = filt_taps // 2 + 1
         self.out = nn.Linear(hidden_size, n_freqs)
@@ -47,7 +48,7 @@ class DDSPNoiseBandDecoder(nn.Module):
         self.n_banks = n_banks
         # control encoder
         self.mlp_0 = MLP(latent_dim, hidden_size)
-        self.gru = nn.GRU(hidden_size, hidden_size, batch_first=True)
+        self.gru = StatefulGRU(hidden_size, hidden_size)
         self.mlp_1 = MLP(hidden_size, hidden_size)
         self.out = nn.Linear(hidden_size, n_banks)
         self.noiseband = NoiseBand(

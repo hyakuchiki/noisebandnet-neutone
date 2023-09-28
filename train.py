@@ -54,10 +54,6 @@ def main(cfg):
         dirpath=os.path.join(os.getcwd(), "ckpts"),
         monitor=cfg.monitor,
         save_last=cfg.save_last,
-        train_time_interval=timedelta(
-            minutes=cfg.save_every_n_min
-        ),  # save ckpt every hour
-        save_on_train_epoch_end=True,
     )
     callbacks = [
         pl.callbacks.LearningRateMonitor(logging_interval="step"),

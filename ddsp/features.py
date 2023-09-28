@@ -81,6 +81,7 @@ class FeatureProcessor(nn.Module):
         self.resamples: Dict[Tuple[int, int], nn.Module] = {}
         print("calculating features:", list(self.features.keys()))
 
+    @torch.jit.unused
     def resample(
         self,
         sample_rate: int,
@@ -122,15 +123,20 @@ class SpectralCentroid(Feature):
         window = torch.hann_window(window_size)
         self.register_buffer("window", window)
         n_fft = n_fft if n_fft else window_size
+        self.n_fft = n_fft
         # self.spec = Spec(n_fft=n_fft, hop_length=self.hop_size, center=False, power=2)
-        spec = Spec(n_fft=n_fft, hop_length=self.hop_size, center=False, power=2)
-        self.spec = spec
+        spec = Spec(
+            n_fft=n_fft,
+            win_length=window_size,
+            hop_length=self.hop_size,
+            center=False,
+            power=2,
+        )
+        self.spec = torch.jit.trace(spec, torch.randn(1, 48000))
 
     def compute_feature(self, x: torch.Tensor) -> torch.Tensor:
         spec = self.spec(x)
-        freqs = torch.fft.rfftfreq(self.window_size, 1 / self.sample_rate)[
-            None, :, None
-        ]
+        freqs = torch.fft.rfftfreq(self.n_fft, 1 / self.sample_rate)[None, :, None]
         cent = (freqs * spec).sum(dim=-2) / (spec.sum(dim=-2) + 1e-5)
         return cent.unsqueeze(-1)  # batch, n_frames, 1
 

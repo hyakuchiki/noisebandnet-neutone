@@ -5,11 +5,14 @@
 
 import math
 from typing import List
+import warnings
 import numpy as np
 import scipy
 import torch
 import torch.nn as nn
+
 from ddsp.dsp import resample_frames
+from ddsp.stream import StreamingUpsample
 
 
 def get_filter(low: float, high: float, sample_rate: int, attenuation_db: float = 30):
@@ -88,12 +91,38 @@ class NoiseBand(nn.Module):
         filtered_noise = get_filtered_noise(filters).permute(1, 0)
         # max_numtaps, n_banks
         self.register_buffer("noises", filtered_noise)
+        self.upsample = StreamingUpsample(
+            self.hop_size, n_channels=self.n_banks // self.n_splits
+        )
         self.max_numtaps = filtered_noise.shape[0]
+        self.register_buffer("position", torch.LongTensor([0]), persistent=False)
+        self.streaming = False
+
+    def amp_noise(self, amp_frames: torch.Tensor, noise: torch.Tensor, n_samples: int):
+        # noise: (1, max_numtaps, n_banks)
+        # amp_frames: (batch, n_frames, n_banks)
+        if self.streaming:
+            amplitudes = self.upsample(amp_frames, size=n_samples)
+            noise_segs = noise[:, int(self.position) : int(self.position + n_samples)]
+        else:
+            amplitudes = self.upsample(amp_frames)[:, :n_samples, :]
+            noise_segs = noise[:, :n_samples]
+        return torch.sum(amplitudes * noise_segs, dim=-1)
+
+    def stream(self, mode: bool = True):
+        if self.training and mode:
+            warnings.warn("Module in streaming mode and training mode")
+        self.streaming = mode
+        # don't split when streaming
+        if mode:
+            self.upsample = StreamingUpsample(self.hop_size, n_channels=self.n_banks)
+            self.upsample.stream(True)
 
     def forward(self, amplitudes: torch.Tensor, n_samples: int) -> torch.Tensor:
         # amplitudes: batch, n_frames, n_banks
-        if n_samples > self.max_numtaps:
-            rep = math.ceil(n_samples / self.max_numtaps)
+        if int(self.position) + n_samples > self.max_numtaps:
+            # noise isn't long enough, loop it once
+            rep = math.ceil((int(self.position) + n_samples) / self.max_numtaps)
             noises = self.noises.tile((rep, 1)).unsqueeze(0)
         else:
             noises = self.noises.unsqueeze(0)
@@ -101,23 +130,15 @@ class NoiseBand(nn.Module):
             noises = noises.roll(
                 int(torch.randint(0, self.max_numtaps, (1,)).item()), dims=0
             )
-        if self.n_splits == 1:
-            amplitudes = resample_frames(amplitudes, float(self.hop_size))
-            amplitudes = amplitudes[:, :n_samples, :]
-            return torch.sum(
-                amplitudes * noises[:, :n_samples, :], dim=-1
-            )  # batch, n_samples
+        if self.streaming or self.n_splits == 1:
+            output = self.amp_noise(amplitudes, noises, n_samples)
+            self.position = (self.position + n_samples) % self.max_numtaps
+            return output
         else:
             split_amps = amplitudes.split(self.n_banks // self.n_splits, dim=-1)
             split_noises = noises.split(self.n_banks // self.n_splits, dim=-1)
             bands: List[torch.Tensor] = []
             for amp, noise in zip(split_amps, split_noises):
-                amp = resample_frames(amp, float(self.hop_size))
-                # crop length in case input isn't divisible by hop_size
-                length = min(n_samples, amp.shape[1])
-                band = torch.sum(
-                    amp[:, :length, :] * noise[:, :length, :],
-                    dim=-1,
-                )
+                band = self.amp_noise(amp, noise, n_samples)
                 bands.append(band)
-            return torch.stack(bands, dim=0).sum(dim=0)
+            return torch.stack(bands, dim=-1).sum(dim=-1)
