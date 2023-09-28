@@ -89,17 +89,6 @@ class NoiseBandNetWrapper(WaveformToWaveformBase):
     def get_native_buffer_sizes(self) -> List[int]:
         return [1200]
 
-    def calc_model_delay_samples(self) -> int:
-        # model latency should also be added if non-causal
-        return self.pre_filter.delay
-
-    def set_model_sample_rate_and_buffer_size(
-        self, sample_rate: int, n_samples: int
-    ) -> bool:
-        # Set prefilter samplerate to current sample rate
-        self.pre_filter.set_parameters(sample_rate=sample_rate)
-        return True
-
     def get_citation(self) -> str:
         return """Barahona-Ríos, A., & Collins, T. (2023).  NoiseBandNet: Controllable Time-Varying Neural Synthesis of Sound Effects Using Filterbanks. arXiv preprint arXiv:2307.08007."""
 
