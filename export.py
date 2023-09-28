@@ -41,12 +41,6 @@ log.setLevel(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
 class NoiseBandNetWrapper(WaveformToWaveformBase):
-    def __init__(self, model: nn.Module, use_debug_mode: bool = True) -> None:
-        super().__init__(model, use_debug_mode)
-        self.pre_filter = FIRFilter(
-            FilterType.BANDPASS, cutoffs=[30.0, 8000.0], filt_size=257
-        )
-
     def get_model_name(self) -> str:
         return "NoiseBandNet.example"
 
@@ -138,7 +132,7 @@ if __name__ == "__main__":
     # join preprocessing and model
     model = NBNStreaming(proc, ae, conf.sample_rate)
     tr_model = torch.jit.script(model)
-    wrapper = FilteredNBNWrapper(tr_model)
+    wrapper = NoiseBandNetWrapper(tr_model)
     save_neutone_model(
         wrapper,
         Path(args.output),
