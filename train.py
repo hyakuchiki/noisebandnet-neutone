@@ -23,15 +23,9 @@ def main(cfg):
         "tb_logs", "", default_hp_metric=False, version=""
     )
     # load dataset
-    print("Starting Preprocessing.")
-    if "db_path" in cfg.data:
-        cfg.data.db_path = hydra.utils.to_absolute_path(cfg.data.db_path)
     if "raw_path" in cfg.data:
         cfg.data.raw_path = hydra.utils.to_absolute_path(cfg.data.raw_path)
-    if "raw_dir" in cfg.data:
-        cfg.data.raw_dir = hydra.utils.to_absolute_path(cfg.data.raw_dir)
     dataset = hydra.utils.instantiate(cfg.data)
-    print(f"Loaded {len(dataset)} samples.")
     train_set, valid_set = random_split(
         dataset,
         [int(len(dataset) * 0.9), len(dataset) - int(len(dataset) * 0.9)],
@@ -50,9 +44,8 @@ def main(cfg):
     # trainer setup
     # keep every checkpoint_every epochs and best epoch
     checkpoint_callback = ModelCheckpoint(
-        save_top_k=-1,
+        save_top_k=1,
         dirpath=os.path.join(os.getcwd(), "ckpts"),
-        monitor=cfg.monitor,
         save_last=cfg.save_last,
     )
     callbacks = [
@@ -68,8 +61,6 @@ def main(cfg):
             fad=cfg.get("monitor_fad", False),
         )
         callbacks.append(xfer_logger)
-    if cfg.save_every_n_steps is not None:
-        callbacks.append(CkptEveryNSteps(cfg.save_every_n_steps, len(train_dl)))
     if cfg.ckpt is not None:
         cfg.ckpt = hydra.utils.to_absolute_path(cfg.ckpt)
     trainer = hydra.utils.instantiate(
@@ -78,15 +69,6 @@ def main(cfg):
     tb_logger.experiment.add_text("cfg", "<pre>" + OmegaConf.to_yaml(cfg) + "</pre>")
     # train model
     trainer.fit(model, train_dl, valid_dl, ckpt_path=cfg.ckpt)
-    # torch.save(datamodule, os.path.join(os.getcwd(), 'datamodule.pt'))
-    # log some specified hparams
-    if cfg.monitor:
-        tb_logger.log_hyperparams(
-            {hp_name: cfg.get(hp_name) for hp_name in cfg.hparams},
-            metrics=trainer.callback_metrics[cfg.monitor],
-        )
-        # return value used for optuna
-        return trainer.callback_metrics[cfg.monitor]
 
 
 if __name__ == "__main__":

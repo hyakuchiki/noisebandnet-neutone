@@ -130,10 +130,9 @@ class AudioLogger(Callback):
 
 
 class XferLogger(Callback):
-    def __init__(self, sounds_dir, sr=24000, feat_proc=None, bkgd_n_batch=8, fad=False):
+    def __init__(self, sounds_dir, sr=24000, feat_proc=None, bkgd_n_batch=8):
         """
         Load ood sounds and see the reconstructed (transferred) result
-        Also calculate FAD of xferred results
         Args:
             sounds_dir (str): folder containing sounds to test xfer from
             sr (int, optional): sampling rate. Defaults to 24000.
