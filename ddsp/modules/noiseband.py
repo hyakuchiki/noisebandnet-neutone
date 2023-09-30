@@ -14,7 +14,7 @@ from ddsp.dsp import resample_frames, kaiserord, kaiser_beta, firwin
 from ddsp.stream import StreamingUpsample
 
 
-def get_filter(
+def get_filter_torch(
     low: float, high: float, sample_rate: int, attenuation_db: float = 30
 ) -> torch.Tensor:
     # calculate kaiser window params from transition width (20% of bandwidth) and attenuation
@@ -35,13 +35,13 @@ def get_filter(
     )
 
 
-def create_fbank(sample_rate: int, n_banks: int, attenuation_db: float = 50):
+def create_fbank_torch(sample_rate: int, n_banks: int, attenuation_db: float = 50):
     n_lows = n_banks // 2
     n_highs = n_banks - n_lows
     low_freqs = torch.linspace(20, sample_rate / 8, 512)
     low_freqs = torch.cat([torch.zeros(1), low_freqs])
     low_filts = [
-        get_filter(
+        get_filter_torch(
             float(low_freqs[i]), float(low_freqs[i + 1]), sample_rate, attenuation_db
         )
         for i in range(n_lows)
@@ -51,7 +51,7 @@ def create_fbank(sample_rate: int, n_banks: int, attenuation_db: float = 50):
     )
     high_freqs[-1] = sample_rate / 2  # correct floating point error
     high_filts = [
-        get_filter(
+        get_filter_torch(
             float(high_freqs[i]), float(high_freqs[i + 1]), sample_rate, attenuation_db
         )
         for i in range(n_highs)
@@ -64,7 +64,7 @@ def create_fbank(sample_rate: int, n_banks: int, attenuation_db: float = 50):
     return filters
 
 
-def get_filtered_noise(filters: List[torch.Tensor]) -> torch.Tensor:
+def get_filtered_noise_torch(filters: List[torch.Tensor]) -> torch.Tensor:
     filters = torch.stack(filters)
     # filters (n_banks, max_numtaps)
     R_filt = torch.fft.rfft(filters).abs()
@@ -154,10 +154,13 @@ class NoiseBand(nn.Module):
         self.hop_size = sample_rate // frame_rate
         # split because amplitudes is too large after upsampling to n_samples
         self.n_splits = n_splits
-        filters = create_fbank(sample_rate, n_banks, attenuation_db)
-        filtered_noise = get_filtered_noise(filters).permute(1, 0)
+        filters = create_fbank_torch(sample_rate, n_banks, attenuation_db)
+        filtered_noise = get_filtered_noise_sci(filters).permute(1, 0)
+        # don't want to save buffer but torch.jit saves nonpersistent buffers
+        # https://github.com/pytorch/pytorch/issues/45012
+        # self.register_buffer("noises", filtered_noise, persistent=False)
         # max_numtaps, n_banks
-        self.register_buffer("noises", filtered_noise, persistent=False)
+        self.register_buffer("noises", filtered_noise)
         self.upsample = StreamingUpsample(
             self.hop_size, n_channels=self.n_banks // self.n_splits
         )
