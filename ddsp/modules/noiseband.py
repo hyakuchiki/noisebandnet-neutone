@@ -7,15 +7,81 @@ import math
 from typing import List
 import warnings
 import numpy as np
-import scipy
 import torch
 import torch.nn as nn
 
-from ddsp.dsp import resample_frames
+from ddsp.dsp import resample_frames, kaiserord, kaiser_beta, firwin
 from ddsp.stream import StreamingUpsample
 
 
-def get_filter(low: float, high: float, sample_rate: int, attenuation_db: float = 30):
+def get_filter(
+    low: float, high: float, sample_rate: int, attenuation_db: float = 30
+) -> torch.Tensor:
+    # calculate kaiser window params from transition width (20% of bandwidth) and attenuation
+    numtaps = kaiserord(attenuation_db, width=(high - low) * 0.2 / (sample_rate / 2))
+    beta = kaiser_beta(attenuation_db)
+    if numtaps % 2 == 0:
+        numtaps += 1  # even taps can't be used for highpass
+    if low == 0:
+        return firwin(
+            numtaps, torch.tensor([high]), beta, pass_zero="lowpass", fs=sample_rate
+        )
+    if high == sample_rate / 2:
+        return firwin(
+            numtaps, torch.tensor([low]), beta, pass_zero="highpass", fs=sample_rate
+        )
+    return firwin(
+        numtaps, torch.tensor([low, high]), beta, pass_zero="bandpass", fs=sample_rate
+    )
+
+
+def create_fbank(sample_rate: int, n_banks: int, attenuation_db: float = 50):
+    n_lows = n_banks // 2
+    n_highs = n_banks - n_lows
+    low_freqs = torch.linspace(20, sample_rate / 8, 512)
+    low_freqs = torch.cat([torch.zeros(1), low_freqs])
+    low_filts = [
+        get_filter(
+            float(low_freqs[i]), float(low_freqs[i + 1]), sample_rate, attenuation_db
+        )
+        for i in range(n_lows)
+    ]
+    high_freqs = torch.logspace(
+        math.log10(sample_rate / 8), math.log10(sample_rate / 2), n_highs + 1
+    )
+    high_freqs[-1] = sample_rate / 2  # correct floating point error
+    high_filts = [
+        get_filter(
+            float(high_freqs[i]), float(high_freqs[i + 1]), sample_rate, attenuation_db
+        )
+        for i in range(n_highs)
+    ]
+    filters = low_filts + high_filts
+    max_numtaps = max([f.shape[-1] for f in filters])
+    filters = [
+        torch.nn.functional.pad(f, (0, max_numtaps - f.shape[-1])) for f in filters
+    ]
+    return filters
+
+
+def get_filtered_noise(filters: List[torch.Tensor]) -> torch.Tensor:
+    filters = torch.stack(filters)
+    # filters (n_banks, max_numtaps)
+    R_filt = torch.fft.rfft(filters).abs()
+    # use same noise for all bands
+    random_phase = (torch.rand(R_filt.shape[-1]) * 2 - 1) * torch.pi
+    random_phase[0] = 0
+    random_phase[-1] = 0
+    random_phase = random_phase[None, :].repeat(filters.shape[0], 1)
+    filtered = torch.fft.irfft(R_filt * torch.exp(1j * random_phase))
+    return filtered  # n_banks, max_numtaps
+
+
+def get_filter_sci(
+    low: float, high: float, sample_rate: int, attenuation_db: float = 30
+):
+    import scipy
+
     # calculate kaiser window params from transition width (20% of bandwidth) and attenuation
     numtaps, beta = scipy.signal.kaiserord(
         ripple=attenuation_db, width=(high - low) * 0.2 / (sample_rate / 2)
@@ -39,20 +105,21 @@ def get_filter(low: float, high: float, sample_rate: int, attenuation_db: float 
     )
 
 
-def create_fbank(sample_rate: int, n_banks: int, attenuation_db: float = 50):
+def create_fbank_sci(sample_rate: int, n_banks: int, attenuation_db: float = 50):
     n_lows = n_banks // 2
     n_highs = n_banks - n_lows
     low_freqs = np.linspace(20, sample_rate / 8, n_lows)
     low_freqs = np.concatenate([[0], low_freqs])
     low_filts = [
-        get_filter(low_freqs[i], low_freqs[i + 1], sample_rate) for i in range(n_lows)
+        get_filter_sci(low_freqs[i], low_freqs[i + 1], sample_rate)
+        for i in range(n_lows)
     ]
     high_freqs = np.logspace(
         np.log10(sample_rate / 8), np.log10(sample_rate / 2), n_highs + 1
     )
     high_freqs[-1] = sample_rate / 2  # correct floating point error
     high_filts = [
-        get_filter(high_freqs[i], high_freqs[i + 1], sample_rate, attenuation_db)
+        get_filter_sci(high_freqs[i], high_freqs[i + 1], sample_rate, attenuation_db)
         for i in range(n_highs)
     ]
     filters = low_filts + high_filts
@@ -62,7 +129,7 @@ def create_fbank(sample_rate: int, n_banks: int, attenuation_db: float = 50):
     return filters
 
 
-def get_filtered_noise(filters):
+def get_filtered_noise_sci(filters):
     if isinstance(filters, list):
         filters = torch.tensor(np.array(filters), dtype=torch.float)
     # filters (n_banks, max_numtaps)
@@ -90,7 +157,7 @@ class NoiseBand(nn.Module):
         filters = create_fbank(sample_rate, n_banks, attenuation_db)
         filtered_noise = get_filtered_noise(filters).permute(1, 0)
         # max_numtaps, n_banks
-        self.register_buffer("noises", filtered_noise)
+        self.register_buffer("noises", filtered_noise, persistent=False)
         self.upsample = StreamingUpsample(
             self.hop_size, n_channels=self.n_banks // self.n_splits
         )

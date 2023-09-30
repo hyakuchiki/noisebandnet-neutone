@@ -536,3 +536,91 @@ def fft_convolve(
     return crop_and_compensate_delay(
         audio_out, audio_size, ir_size, padding, delay_compensation
     )
+
+
+# below ported from scipy.signal
+def kaiser_beta(attenuation_db: float) -> float:
+    if attenuation_db > 50:
+        beta = 0.1102 * (attenuation_db - 8.7)
+    elif attenuation_db > 21:
+        beta = 0.5842 * (attenuation_db - 21) ** 0.4 + 0.07886 * (attenuation_db - 21)
+    else:
+        beta = 0.0
+    return beta
+
+
+def kaiserord(attenuation_db: float, width: float) -> int:
+    A = abs(attenuation_db)  # in case somebody is confused as to what's meant
+    if A < 8:
+        # Formula for N is not valid in this range.
+        raise ValueError(
+            "Requested maximum ripple attentuation %f is too "
+            "small for the Kaiser formula." % A
+        )
+    # Kaiser's formula (as given in Oppenheim and Schafer) is for the filter
+    # order, so we have to add 1 to get the number of taps.
+    numtaps = (A - 7.95) / 2.285 / (math.pi * width) + 1
+    return math.ceil(numtaps)
+
+
+# limited to kaiser windows
+def firwin(
+    numtaps: int,
+    cutoff: torch.Tensor,
+    beta: float,
+    pass_zero: str,
+    fs: int,
+    scale: bool = True,
+) -> torch.Tensor:
+    # cutoff: (1 or 2)
+    nyq = 0.5 * fs
+    if pass_zero in ("bandstop", "lowpass"):
+        pz = True
+    elif pass_zero in ("highpass", "bandpass"):
+        pz = False
+    else:
+        pz = True
+
+    cutoff = cutoff / float(nyq)
+    # bandpass: shape=2, pass_nyquist = False
+    # bandstop: shape=2, pass_nyquist = True
+    pass_nyquist = bool(cutoff.shape[-1] & 1) ^ pz
+
+    # Insert 0 and/or 1 at the ends of cutoff so that the length of cutoff
+    # is even, and each pair in cutoff corresponds to passband.
+    cutoff = cutoff
+    zero = torch.zeros_like(cutoff)[:1]
+    ones = torch.ones_like(cutoff)[:1]
+
+    if pz:
+        cutoff = torch.cat([zero, cutoff])
+    if pass_nyquist:
+        cutoff = torch.cat([cutoff, ones])
+
+    # `bands` is a 2-D array; each row gives the left and right edges of
+    # a passband.
+    # bands: n_passbands=1or2, 2
+    bands = cutoff.reshape(-1, 2)
+    # Build up the coefficients.
+    alpha = 0.5 * (numtaps - 1)
+    m = torch.arange(0, numtaps) - alpha
+    h = torch.zeros_like(m)
+    for b in bands:
+        left, right = b[0], b[1]
+        h += right * torch.sinc(right * m)
+        h -= left * torch.sinc(left * m)
+
+    # Get and apply the window function.
+    window = torch.kaiser_window(numtaps, periodic=True, beta=beta)
+    h *= window
+
+    # Now handle scaling if desired.
+    if scale:
+        # Get the first passband.
+        left, right = bands[0, 0], bands[0, 1]
+        sf = torch.where(left == 0.0, 0.0, (left + right) * 0.5)
+        sf = torch.where(right == 1.0, 1.0, sf)
+        c = torch.cos(torch.pi * m * sf)
+        s = torch.sum(h * c)
+        h /= s
+    return h

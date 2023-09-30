@@ -58,7 +58,6 @@ def main(cfg):
             hydra.utils.to_absolute_path(cfg.xfer_dir),
             sr=cfg.sample_rate,
             feat_proc=dataset.feat_proc,
-            fad=cfg.get("monitor_fad", False),
         )
         callbacks.append(xfer_logger)
     if cfg.ckpt is not None:
