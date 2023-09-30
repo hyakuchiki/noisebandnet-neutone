@@ -17,7 +17,7 @@ from neutone_sdk.filters import FIRFilter, FilterType
 from neutone_sdk.utils import save_neutone_model
 
 from ddsp.model import AutoEncoderModel
-from ddsp.util import load_audio_file
+from ddsp.util import load_audio_file, exp_scale
 from ddsp.stream import switch_streaming_mode
 
 
@@ -27,12 +27,37 @@ class NBNStreaming(nn.Module):
         self.feat_proc = feat_proc
         self.ae = ae
         self.sr = sr
+        self.rand_amp_k = 16
+        self.register_buffer("count", torch.zeros(1, dtype=torch.long))
+        self.register_buffer("amp_noise", torch.zeros(1, 1, 1, dtype=torch.long))
 
-    def forward(self, audio):
+    def forward(self, audio, centroid_shift, rand_amount, tilt_amount):
         feats = self.feat_proc(audio, self.sr)
         feats.update({"audio": audio})
-        out = self.ae(feats)
-        return out["audio"]
+        # shift centroid
+        MAX_SHIFT = 48  # semitones
+        pshift = (centroid_shift - 0.5) * 2 * MAX_SHIFT  # -24~24
+        semishift = torch.round(pshift)
+        centroid_mult = 2 ** (semishift / 12)
+        feats["centroid"] *= centroid_mult
+        # encode
+        enc_data = self.ae.encode(feats)
+        amps = self.ae.decoder.infer(enc_data["z"])  # amps: batch, n_frames, n_banks
+        # randomize amps
+        n_frames = feats["centroid"].shape[1]
+        self.count -= n_frames
+        N_FRAMES = 30
+        if self.count <= 0:  # only change noise every N_FRAMES
+            self.count += torch.LongTensor([N_FRAMES], device=amps.device)
+            self.amp_noise = torch.rand_like(amps[:, :1, :]) * 20.0 + 0.1
+        amps *= torch.clamp(self.amp_noise**rand_amount, 0.1, 10.0)
+        # add tilt
+        ta = float((tilt_amount - 0.5) * 2)  # -1~1
+        amps *= torch.logspace(-ta, ta, amps.shape[-1], device=amps.device)[
+            None, None, :
+        ]
+        audio = self.ae.decoder.synthesize(amps, audio.shape[-1])
+        return audio
 
 
 logging.basicConfig()
@@ -75,7 +100,23 @@ class NoiseBandNetWrapper(WaveformToWaveformBase):
         return False
 
     def get_neutone_parameters(self) -> List[NeutoneParameter]:
-        return []
+        return [
+            NeutoneParameter(
+                name="Brightness",
+                description="Shift the brightness of input",
+                default_value=0.5,
+            ),
+            NeutoneParameter(
+                name="Frequency Chaos",
+                description="Randomize the amplitude of each frequency band",
+                default_value=0.0,
+            ),
+            NeutoneParameter(
+                name="Frequency Tilt",
+                description="Tilt the amplitude distribution of each frequency band",
+                default_value=0.5,
+            ),
+        ]
 
     def is_input_mono(self) -> bool:
         return True  # <-Set to False for stereo (each channel processed separately)
@@ -97,7 +138,9 @@ class NoiseBandNetWrapper(WaveformToWaveformBase):
         # Apply pre-filter
         # x = self.pre_filter(x)
         ## parameters edit the latent variable
-        out = self.model(x)
+        out = self.model(
+            x, params["Brightness"], params["Frequency Chaos"], params["Frequency Tilt"]
+        )
         out = out.squeeze(1)
         return out
 

@@ -55,11 +55,18 @@ class DDSPNoiseBandDecoder(nn.Module):
             sample_rate, n_banks, frame_rate, attenuation_db, n_splits
         )
 
-    def forward(self, data: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        x, _hidden = self.gru(self.mlp_0(data["z"]))
+    def infer(self, z: torch.Tensor):
+        x, _hidden = self.gru(self.mlp_0(z))
         amps = self.out(self.mlp_1(x))
         amps = exp_sigmoid(amps, 10.0, float(self.n_banks))
-        out_audio = self.noiseband(amps, n_samples=data["audio"].shape[-1])
+        return amps
+
+    def synthesize(self, amps: torch.Tensor, n_samples: int):
+        return self.noiseband(amps, n_samples=n_samples)
+
+    def forward(self, data: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        amps = self.infer(data["z"])
+        out_audio = self.synthesize(amps, data["audio"].shape[-1])
         output = data.copy()
-        output["audio"] = out_audio.unsqueeze(1)  # N, 1, T
+        output["audio"] = out_audio.unsqueeze(1)
         return output

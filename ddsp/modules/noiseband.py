@@ -154,7 +154,7 @@ class NoiseBand(nn.Module):
         self.hop_size = sample_rate // frame_rate
         # split because amplitudes is too large after upsampling to n_samples
         self.n_splits = n_splits
-        filters = create_fbank_torch(sample_rate, n_banks, attenuation_db)
+        filters = create_fbank_sci(sample_rate, n_banks, attenuation_db)
         filtered_noise = get_filtered_noise_sci(filters).permute(1, 0)
         # don't want to save buffer but torch.jit saves nonpersistent buffers
         # https://github.com/pytorch/pytorch/issues/45012
