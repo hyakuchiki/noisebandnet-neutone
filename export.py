@@ -160,6 +160,7 @@ if __name__ == "__main__":
     ckpt_path = Path(args.ckpt).parents[1]
     conf = OmegaConf.load(ckpt_path / ".hydra/config.yaml")
     proc = hydra.utils.instantiate(conf.data.feat_proc)
+    proc = proc.eval()
     switch_streaming_mode(proc)
     # join preprocessing and model
     model = NBNStreaming(proc, ae, conf.sample_rate)
