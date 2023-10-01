@@ -128,7 +128,7 @@ class NoiseBandNetWrapper(WaveformToWaveformBase):
         return [48000]  # <-Set to model sr during training
 
     def get_native_buffer_sizes(self) -> List[int]:
-        return [1200]
+        return [960]
 
     def get_citation(self) -> str:
         return """Barahona-Ríos, A., & Collins, T. (2023).  NoiseBandNet: Controllable Time-Varying Neural Synthesis of Sound Effects Using Filterbanks. arXiv preprint arXiv:2307.08007."""
