@@ -10,3 +10,7 @@ notes/
 sounds/
 exports/
 temp/
+
+build/
+dist/
+*.egg-info

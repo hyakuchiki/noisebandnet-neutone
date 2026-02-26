@@ -1,0 +1,37 @@
+[project]
+name = "noisebandnet-neutone"
+version = "0.1.0"
+description = "Implementation of NoiseBandNet for Quosmo/Neutone."
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "nnaudio",
+    "hydra-core",
+    "lightning",
+    "lmdb",
+    "tensorboard",
+    "scipy",
+    "matplotlib",
+    "neutone_sdk>=1.5.2",
+    "torch==2.10.0",
+    "torchaudio>=2.10.0",
+    "torchcodec",
+    "numpy<2.3.0",
+]
+
+[tool.uv]
+package = true
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.setuptools.packages.find]
+include = ["noisebandnet*"]
+
+[tool.setuptools.package-data]
+"noisebandnet" = ["assets/*", "configs/**/*"]
+
+[project.scripts]
+train = "noisebandnet.scripts.train:main"
+export = "noisebandnet.scripts.export:main"
