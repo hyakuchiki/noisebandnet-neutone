@@ -34,3 +34,4 @@ include = ["noisebandnet*"]
 
 [project.scripts]
 train = "noisebandnet.scripts.train:main"
+export = "noisebandnet.scripts.export:main"

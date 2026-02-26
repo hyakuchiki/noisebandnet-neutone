@@ -7,7 +7,7 @@ from omegaconf import OmegaConf
 import torch
 from torch import Tensor, nn
 from torch.nn.utils.weight_norm import WeightNorm
-from neutone_sdk import WaveformToWaveformBase, NeutoneParameter
+from neutone_sdk import WaveformToWaveformBase, ContinuousNeutoneParameter, NeutoneParameter
 from neutone_sdk.audio import (
     AudioSample,
     AudioSamplePair,
@@ -16,9 +16,8 @@ from neutone_sdk.audio import (
 from neutone_sdk.filters import FIRFilter, FilterType
 from neutone_sdk.utils import save_neutone_model
 
-from ddsp.model import AutoEncoderModel
-from ddsp.util import load_audio_file, exp_scale
-from ddsp.stream import switch_streaming_mode
+from noisebandnet.ddsp.model import AutoEncoderModel
+from noisebandnet.ddsp.stream import switch_streaming_mode
 
 
 class NBNStreaming(nn.Module):
@@ -66,41 +65,32 @@ log.setLevel(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
 class NoiseBandNetWrapper(WaveformToWaveformBase):
-    @torch.jit.export
     def get_model_name(self) -> str:
         return "NoiseBandNet.example"
 
-    @torch.jit.export
     def get_model_authors(self) -> List[str]:
         return ["Author Name"]
 
-    @torch.jit.export
     def get_model_short_description(self) -> str:
         return "NoiseBandNet model trained on ..."
 
-    @torch.jit.export
     def get_model_long_description(self) -> str:
         return "NoiseBandNet timbre transfer model trained on xxx sounds. Useful for xxx sounds."  # <-EDIT THIS
 
-    @torch.jit.export
     def get_technical_description(self) -> str:
         return "NoiseBandNet proposed by Adrián Barahona-Ríos, Tom Collins"
 
-    @torch.jit.export
     def get_technical_links(self) -> Dict[str, str]:
         return {
             # "Paper": "https://arxiv.org/abs/2307.08007",
         }
 
-    @torch.jit.export
     def get_tags(self) -> List[str]:
         return ["timbre transfer", "NoiseBandNet"]
 
-    @torch.jit.export
     def get_model_version(self) -> str:
         return "1.0.0"
 
-    @torch.jit.export
     def is_experimental(self) -> bool:
         """
         set to True for models in experimental stage
@@ -108,20 +98,19 @@ class NoiseBandNetWrapper(WaveformToWaveformBase):
         """
         return False
 
-    @torch.jit.export
     def get_neutone_parameters(self) -> List[NeutoneParameter]:
         return [
-            NeutoneParameter(
+            ContinuousNeutoneParameter(
                 name="Brightness",
                 description="Shift the brightness of input",
                 default_value=0.5,
             ),
-            NeutoneParameter(
+            ContinuousNeutoneParameter(
                 name="Frequency Chaos",
                 description="Randomize the amplitude of each frequency band",
                 default_value=0.0,
             ),
-            NeutoneParameter(
+            ContinuousNeutoneParameter(
                 name="Frequency Tilt",
                 description="Tilt the amplitude distribution of each frequency band",
                 default_value=0.5,
@@ -159,16 +148,16 @@ class NoiseBandNetWrapper(WaveformToWaveformBase):
         out = out.squeeze(1)
         return out
 
-
-if __name__ == "__main__":
+def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("ckpt", type=str)
     parser.add_argument("-o", "--output", type=str, default="exports/test-nm")
-    args = parser.parse_args()
+    args = parser.parse_args(args)
     full = AutoEncoderModel.load_from_checkpoint(
         args.ckpt,
         map_location="cpu",
         strict=False,
+        weights_only=False,
     )
     ae = full.ae.eval()
     switch_streaming_mode(ae)
@@ -176,6 +165,8 @@ if __name__ == "__main__":
     conf = OmegaConf.load(ckpt_path / ".hydra/config.yaml")
     proc = hydra.utils.instantiate(conf.data.feat_proc)
     proc = proc.eval()
+    if "centroid" in proc.features:
+        proc.features["centroid"].spec = torch.jit.trace(proc.features["centroid"].spec, torch.randn(1, 48000))
     switch_streaming_mode(proc)
     # join preprocessing and model
     model = NBNStreaming(proc, ae, conf.sample_rate)
@@ -189,3 +180,6 @@ if __name__ == "__main__":
         submission=True,
         audio_sample_pairs=None,
     )
+
+if __name__ == "__main__":
+    main()

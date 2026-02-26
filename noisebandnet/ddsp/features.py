@@ -126,14 +126,13 @@ class SpectralCentroid(Feature):
         n_fft = n_fft if n_fft else window_size
         self.n_fft = n_fft
         # self.spec = Spec(n_fft=n_fft, hop_length=self.hop_size, center=False, power=2)
-        spec = Spec(
+        self.spec = Spec(
             n_fft=n_fft,
             win_length=window_size,
             hop_length=self.hop_size,
             center=False,
             power=2,
         )
-        self.spec = torch.jit.trace(spec, torch.randn(1, 48000))
 
     def compute_feature(self, x: torch.Tensor) -> torch.Tensor:
         spec = self.spec(x)

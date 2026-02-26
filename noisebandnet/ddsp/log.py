@@ -137,7 +137,6 @@ class XferLogger(Callback):
             sounds_dir (str): folder containing sounds to test xfer from
             sr (int, optional): sampling rate. Defaults to 24000.
         """
-        breakpoint()
         super().__init__()
         self.sounds_dir = sounds_dir
         self.sound_paths = find_audio_files(sounds_dir)
