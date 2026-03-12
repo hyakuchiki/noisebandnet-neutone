@@ -1,4 +1,6 @@
-import os, argparse, logging
+import argparse
+import logging
+import os
 from pathlib import Path
 from typing import Dict, List
 
@@ -6,14 +8,11 @@ import hydra
 from omegaconf import OmegaConf
 import torch
 from torch import Tensor, nn
-from torch.nn.utils.weight_norm import WeightNorm
-from neutone_sdk import WaveformToWaveformBase, ContinuousNeutoneParameter, NeutoneParameter
-from neutone_sdk.audio import (
-    AudioSample,
-    AudioSamplePair,
-    render_audio_sample,
+from neutone_sdk import (
+    WaveformToWaveformBase,
+    ContinuousNeutoneParameter,
+    NeutoneParameter,
 )
-from neutone_sdk.filters import FIRFilter, FilterType
 from neutone_sdk.utils import save_neutone_model
 
 from noisebandnet.ddsp.model import AutoEncoderModel
@@ -148,10 +147,11 @@ class NoiseBandNetWrapper(WaveformToWaveformBase):
         out = out.squeeze(1)
         return out
 
+
 def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("ckpt", type=str)
-    parser.add_argument("-o", "--output", type=str, default="exports/test-nm")
+    parser.add_argument("-o", "--output", type=str, default="../exports/test-nm")
     args = parser.parse_args(args)
     full = AutoEncoderModel.load_from_checkpoint(
         args.ckpt,
@@ -166,7 +166,9 @@ def main(args=None):
     proc = hydra.utils.instantiate(conf.data.feat_proc)
     proc = proc.eval()
     if "centroid" in proc.features:
-        proc.features["centroid"].spec = torch.jit.trace(proc.features["centroid"].spec, torch.randn(1, 48000))
+        proc.features["centroid"].spec = torch.jit.trace(
+            proc.features["centroid"].spec, torch.randn(1, 48000)
+        )
     switch_streaming_mode(proc)
     # join preprocessing and model
     model = NBNStreaming(proc, ae, conf.sample_rate)
@@ -180,6 +182,7 @@ def main(args=None):
         submission=True,
         audio_sample_pairs=None,
     )
+
 
 if __name__ == "__main__":
     main()
