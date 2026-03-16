@@ -13,7 +13,7 @@ def main(cfg):
     import pytorch_lightning as pl
     import torch
     from omegaconf import OmegaConf
-    from pytorch_lightning.callbacks import ModelCheckpoint, RichProgressBar
+    from pytorch_lightning.callbacks import ModelCheckpoint, TQDMProgressBar
     from torch.utils.data import DataLoader, random_split
 
     from noisebandnet.ddsp.log import AudioLogger, XferLogger
@@ -58,7 +58,7 @@ def main(cfg):
         pl.callbacks.LearningRateMonitor(logging_interval="step"),
         AudioLogger(sr=cfg.sample_rate),
         checkpoint_callback,
-        RichProgressBar(refresh_rate=25),
+        TQDMProgressBar(refresh_rate=25),
     ]
     if cfg.xfer_dir is not None:
         xfer_logger = XferLogger(
