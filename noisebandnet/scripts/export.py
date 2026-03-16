@@ -5,15 +5,15 @@ from pathlib import Path
 from typing import Dict, List
 
 import hydra
-from omegaconf import OmegaConf
 import torch
-from torch import Tensor, nn
 from neutone_sdk import (
-    WaveformToWaveformBase,
     ContinuousNeutoneParameter,
     NeutoneParameter,
+    WaveformToWaveformBase,
 )
 from neutone_sdk.utils import save_neutone_model
+from omegaconf import OmegaConf
+from torch import Tensor, nn
 
 from noisebandnet.ddsp.model import AutoEncoderModel
 from noisebandnet.ddsp.stream import switch_streaming_mode
@@ -64,17 +64,33 @@ log.setLevel(level=os.environ.get("LOGLEVEL", "INFO"))
 
 
 class NoiseBandNetWrapper(WaveformToWaveformBase):
+    def __init__(
+        self,
+        model: nn.Module,
+        model_name: str = "NoiseBandNet.example",
+        model_authors: List[str] = ["Author Name"],
+        model_desc_short: str = "NoiseBandNet model trained on ...",
+        model_desc_long: str = "NoiseBandNet timbre transfer model trained on xxx sounds. Useful for xxx sounds.",
+        model_version: str = "1.0",
+    ):
+        super().__init__(model)
+        self.model_name = model_name
+        self.model_authors = model_authors
+        self.model_desc_short = model_desc_short
+        self.model_desc_long = model_desc_long
+        self.model_version = model_version
+
     def get_model_name(self) -> str:
-        return "NoiseBandNet.example"
+        return self.model_name
 
     def get_model_authors(self) -> List[str]:
-        return ["Author Name"]
+        return self.model_authors
 
     def get_model_short_description(self) -> str:
-        return "NoiseBandNet model trained on ..."
+        return self.model_desc_short
 
     def get_model_long_description(self) -> str:
-        return "NoiseBandNet timbre transfer model trained on xxx sounds. Useful for xxx sounds."  # <-EDIT THIS
+        return self.model_desc_long
 
     def get_technical_description(self) -> str:
         return "NoiseBandNet proposed by Adrián Barahona-Ríos, Tom Collins"
@@ -88,7 +104,7 @@ class NoiseBandNetWrapper(WaveformToWaveformBase):
         return ["timbre transfer", "NoiseBandNet"]
 
     def get_model_version(self) -> str:
-        return "1.0.0"
+        return self.model_version
 
     def is_experimental(self) -> bool:
         """
@@ -151,6 +167,15 @@ class NoiseBandNetWrapper(WaveformToWaveformBase):
 def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("ckpt", type=str)
+    parser.add_argument("-n", "--name", type=str, help="Model name")
+    parser.add_argument("-a", "--authors", nargs="+", help="Model authors")
+    parser.add_argument(
+        "-s", "--short_description", type=str, help="Model short description"
+    )
+    parser.add_argument(
+        "-l", "--long_description", type=str, help="Model long description"
+    )
+    parser.add_argument("-v", "--version", type=str, help="Model version")
     parser.add_argument("-o", "--output", type=str, default="../exports/test-nm")
     args = parser.parse_args(args)
     full = AutoEncoderModel.load_from_checkpoint(
@@ -173,7 +198,14 @@ def main(args=None):
     # join preprocessing and model
     model = NBNStreaming(proc, ae, conf.sample_rate)
     tr_model = torch.jit.script(model)
-    wrapper = NoiseBandNetWrapper(tr_model)
+    wrapper = NoiseBandNetWrapper(
+        tr_model,
+        model_name=args.name,
+        model_authors=args.authors,
+        model_desc_short=args.short_description,
+        model_desc_long=args.long_description,
+        model_version=args.version,
+    )
     save_neutone_model(
         wrapper,
         Path(args.output),
