@@ -73,12 +73,12 @@ class NoiseBandNetWrapper(WaveformToWaveformBase):
         model_desc_long: str = "NoiseBandNet timbre transfer model trained on xxx sounds. Useful for xxx sounds.",
         model_version: str = "1.0",
     ):
-        super().__init__(model)
         self.model_name = model_name
         self.model_authors = model_authors
         self.model_desc_short = model_desc_short
         self.model_desc_long = model_desc_long
         self.model_version = model_version
+        super().__init__(model)
 
     def get_model_name(self) -> str:
         return self.model_name
