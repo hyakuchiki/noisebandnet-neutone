@@ -176,7 +176,12 @@ def main(args=None):
         "-l", "--long_description", type=str, help="Model long description"
     )
     parser.add_argument("-v", "--version", type=str, help="Model version")
-    parser.add_argument("-o", "--output", type=str, default="../exports/test-nm")
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default=f"{os.path.abspath(__file__)}/../exports/test-nm",
+    )
     args = parser.parse_args(args)
     full = AutoEncoderModel.load_from_checkpoint(
         args.ckpt,
