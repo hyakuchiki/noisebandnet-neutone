@@ -1,0 +1,15 @@
+losses:
+  _target_: torch.nn.ModuleDict
+  modules:
+    mel:
+      _target_: noisebandnet.ddsp.losses.MelLoss
+      # sample_rate should be provided by the Hydra config (e.g. ${sample_rate})
+      sample_rate: ${sample_rate}
+      n_fft: 2048
+      win_length: null
+      hop_length: 1024
+      n_mels: 80
+      fmin: 30
+      fmax: 8000
+sched:
+  mel: 1.0

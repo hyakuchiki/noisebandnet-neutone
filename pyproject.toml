@@ -10,7 +10,7 @@ dependencies = [
     "hydra-core",
     "lightning",
     "lmdb",
-    "tensorboard",
+    "tensorboard>=2.12",
     "scipy",
     "matplotlib",
     "neutone_sdk>=1.5.2",
@@ -18,7 +18,8 @@ dependencies = [
     "torchaudio>=2.10.0",
     "torchcodec",
     "numpy<2.3.0",
-    "rich"
+    "rich",
+    "setuptools<82",
 ]
 
 [tool.uv]
@@ -36,3 +37,4 @@ include = ["noisebandnet*"]
 [project.scripts]
 train = "noisebandnet.scripts.train:main"
 export-neutone = "noisebandnet.scripts.export:main"
+render-neutone = "noisebandnet.scripts.render:main"

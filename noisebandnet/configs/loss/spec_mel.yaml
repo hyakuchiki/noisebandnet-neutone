@@ -1,0 +1,23 @@
+losses:
+  _target_: torch.nn.ModuleDict
+  modules:
+    spec:
+      _target_: noisebandnet.ddsp.losses.MultiSpecLoss
+      fft_sizes: [64, 128, 256, 512, 1024, 2048]
+      hop_lengths: null
+      win_lengths: null
+      mag_w: 1.0
+      log_mag_w: 1.0
+    mel:
+      _target_: noisebandnet.ddsp.losses.MelLoss
+      # sample_rate is pulled from the global Hydra config
+      sample_rate: ${sample_rate}
+      n_fft: 2048
+      win_length: null
+      hop_length: 1024
+      n_mels: 80
+      fmin: 30
+      fmax: 8000
+sched:
+  spec: 1.0
+  mel: 0.5

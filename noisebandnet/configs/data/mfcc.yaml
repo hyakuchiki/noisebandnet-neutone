@@ -1,0 +1,20 @@
+_target_: noisebandnet.ddsp.data.SmallDataset
+
+raw_path: null
+sample_rate: ${sample_rate}
+length: 1.0
+frame_rate: 200
+dataset_size: 6400
+feat_proc:
+  _target_: noisebandnet.ddsp.features.FeatureProcessor
+  features:
+    mfcc:
+      _target_: noisebandnet.ddsp.features.MFCC
+      sample_rate: ${sample_rate}
+      window_size: 1024
+      frame_rate: ${data.frame_rate}
+      center: True
+      n_mfcc: 10
+      n_mels: 80
+      fmin: 30
+      fmax: null

@@ -161,3 +161,47 @@ class Volume(Feature):
         )
         rms = a2_win.mean(dim=-1).sqrt()
         return rms.unsqueeze(-1)  # batch, n_frames, 1
+
+
+class MFCC(Feature):
+    """
+    Compute first `n_mfcc` MFCCs per frame using `torchaudio.transforms.MFCC`.
+
+    Outputs shape: (batch, n_frames, n_mfcc)
+    """
+
+    def __init__(
+        self,
+        sample_rate: int,
+        window_size: int,
+        frame_rate: int,
+        center: bool = True,
+        n_mfcc: int = 10,
+        n_mels: int = 80,
+        fmin: float = 30.0,
+        fmax: Optional[float] = None,
+    ):
+        super().__init__(sample_rate, window_size, frame_rate, center)
+        self.n_mfcc = n_mfcc
+        self.n_mels = n_mels
+        self.fmin = fmin
+        self.fmax = fmax if fmax is not None else float(sample_rate // 2)
+        # torchaudio MFCC accepts melkwargs for the MelSpectrogram step
+        melkwargs = {
+            "n_fft": self.window_size,
+            "win_length": self.window_size,
+            "hop_length": self.hop_size,
+            "n_mels": self.n_mels,
+            "f_min": self.fmin,
+            "f_max": self.fmax,
+        }
+        self.mfcc = torchaudio.transforms.MFCC(
+            sample_rate=sample_rate, n_mfcc=self.n_mfcc, melkwargs=melkwargs
+        )
+
+    def compute_feature(self, x: torch.Tensor) -> torch.Tensor:
+        # torchaudio MFCC expects (..., time) and returns (batch, n_mfcc, n_frames)
+        mfcc = self.mfcc(x)
+        # transpose to (batch, n_frames, n_mfcc)
+        mfcc = mfcc.permute(0, 2, 1)
+        return mfcc

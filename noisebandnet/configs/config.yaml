@@ -4,7 +4,7 @@ defaults:
   - _self_
   - data: default.yaml
   - ae: noiseband.yaml
-  - loss: spec.yaml
+  - loss: mel.yaml
   - trainer: default.yaml
 
 name: null
@@ -25,8 +25,8 @@ trainer:
 hydra:
   job:
     chdir: true
-    config: 
-      override_dirname: 
+    config:
+      override_dirname:
         kv_sep: "-"
         item_sep: "_"
   run:

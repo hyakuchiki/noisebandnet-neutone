@@ -17,7 +17,6 @@ class IRReverb(nn.Module):
     def __init__(self, ir_s=1.0, sr=48000):
         super().__init__()
         ir_length = int(ir_s * sr)
-        noise = torch.rand(1, ir_length) * 2 - 1  # [-1, 1)
         # initial value should be zero to mask dry signal
         self.register_buffer("zero", torch.zeros(1))
         time = torch.linspace(0.0, 1.0, ir_length - 1)
@@ -60,4 +59,4 @@ class IRReverb(nn.Module):
                 audio.shape[0], -1
             )
             wet = dsp.fft_convolve(audio, ir, padding="same", delay_compensation=0)
-            return audio + wet
+        return audio + wet
