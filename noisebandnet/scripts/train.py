@@ -1,6 +1,6 @@
-import hydra
 from importlib.resources import files
 
+import hydra
 
 CONFIG_DIR = files("noisebandnet").joinpath("configs")
 
@@ -9,14 +9,15 @@ CONFIG_DIR = files("noisebandnet").joinpath("configs")
 def main(cfg):
     import os
     import warnings
+
     import pytorch_lightning as pl
     import torch
     from omegaconf import OmegaConf
-    from pytorch_lightning.callbacks import ModelCheckpoint
+    from pytorch_lightning.callbacks import ModelCheckpoint, TQDMProgressBar
     from torch.utils.data import DataLoader, random_split
 
-    from noisebandnet.ddsp.model import AutoEncoderModel
     from noisebandnet.ddsp.log import AudioLogger, XferLogger
+    from noisebandnet.ddsp.model import AutoEncoderModel
 
     torch.set_float32_matmul_precision("high")
     pl.seed_everything(cfg.seed, workers=True)
@@ -57,6 +58,7 @@ def main(cfg):
         pl.callbacks.LearningRateMonitor(logging_interval="step"),
         AudioLogger(sr=cfg.sample_rate),
         checkpoint_callback,
+        TQDMProgressBar(refresh_rate=25),
     ]
     if cfg.xfer_dir is not None:
         xfer_logger = XferLogger(
