@@ -30,3 +30,15 @@ class VolEncoder(nn.Module):
         output = data.copy()
         output["enc_out"] = vol
         return output
+
+
+class MFCCEncoder(nn.Module):
+    def __init__(self, n_mfcc=13):
+        super().__init__()
+        self.encoder_dim = n_mfcc
+
+    def forward(self, data: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        mfcc = data["mfcc"]
+        output = data.copy()
+        output["enc_out"] = mfcc
+        return output

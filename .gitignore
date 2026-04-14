@@ -8,6 +8,7 @@ notes/
 *.ipynb
 *.ts
 sounds/
+inputs/
 exports/
 temp/
 
@@ -16,3 +17,7 @@ dist/
 *.egg-info
 
 rsync-exclude.txt
+
+*.wav
+*.mp3
+*.flac
