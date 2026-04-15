@@ -1,9 +1,10 @@
-from typing import Optional, Dict, Tuple
 from abc import ABC, abstractmethod
+from typing import Optional, Dict, Tuple
 
 import torch
 import torch.nn as nn
 import torchaudio
+import torchcrepe
 
 from noisebandnet.ddsp.spectral import Spec
 from noisebandnet.ddsp.util import center_pad, slice_windows
@@ -111,7 +112,7 @@ class FeatureProcessor(nn.Module):
         return feature_data
 
 
-class SpectralCentroid(Feature):
+class SpectralFeature(Feature):
     def __init__(
         self,
         sample_rate: int,
@@ -125,7 +126,6 @@ class SpectralCentroid(Feature):
         self.register_buffer("window", window)
         n_fft = n_fft if n_fft else window_size
         self.n_fft = n_fft
-        # self.spec = Spec(n_fft=n_fft, hop_length=self.hop_size, center=False, power=2)
         self.spec = Spec(
             n_fft=n_fft,
             win_length=window_size,
@@ -134,11 +134,49 @@ class SpectralCentroid(Feature):
             power=2,
         )
 
+
+class SpectralCentroid(SpectralFeature):
+
     def compute_feature(self, x: torch.Tensor) -> torch.Tensor:
         spec = self.spec(x)
         freqs = torch.fft.rfftfreq(self.n_fft, 1 / self.sample_rate)[None, :, None]
         cent = (freqs * spec).sum(dim=-2) / (spec.sum(dim=-2) + 1e-5)
         return cent.unsqueeze(-1)  # batch, n_frames, 1
+
+
+class SpectralBandwidth(SpectralFeature):
+    """
+    Spectral bandwidth per frame (second central moment of the power spectrum).
+    Returns shape (batch, n_frames, 1) with values in Hz.
+    """
+
+    def compute_feature(self, x: torch.Tensor) -> torch.Tensor:
+        spec = self.spec(x)
+        freqs = torch.fft.rfftfreq(self.n_fft, 1 / self.sample_rate)[None, :, None]
+        cent = (freqs * spec).sum(dim=-2) / (spec.sum(dim=-2) + 1e-5)
+        freq_diff = freqs - cent[..., None]
+        var = (freq_diff**2 * spec).sum(dim=-2) / (spec.sum(dim=-2) + 1e-5)
+        bw = torch.sqrt(var)
+        return bw.unsqueeze(-1)
+
+
+class SpectralFlatness(SpectralFeature):
+    """
+    Spectral flatness (Wiener entropy) per frame.
+
+    Computed as geometric_mean(power_spectrum) / arithmetic_mean(power_spectrum).
+    Returns values in [0, 1], shape (batch, n_frames, 1).
+    """
+
+    def compute_feature(self, x: torch.Tensor) -> torch.Tensor:
+        spec = self.spec(x)
+        # geometric mean across frequency bins
+        log_spec = torch.log(spec + 1e-12)
+        geometric_mean = torch.exp(log_spec.mean(dim=-2))
+        # arithmetic mean across frequency bins
+        arithmatic_mean = spec.mean(dim=-2)
+        flatness = geometric_mean / (arithmatic_mean + 1e-12)
+        return flatness.unsqueeze(-1)
 
 
 class Volume(Feature):
@@ -161,6 +199,46 @@ class Volume(Feature):
         )
         rms = a2_win.mean(dim=-1).sqrt()
         return rms.unsqueeze(-1)  # batch, n_frames, 1
+
+
+class F0(Feature):
+    """
+    Fundamental frequency (F0) feature using torchcrepe.
+
+    Outputs shape: (batch, n_frames, 1) with F0 in Hz. Requires `torchcrepe` to be
+    installed; raises ImportError with instructions if not available.
+    """
+
+    def __init__(
+        self,
+        sample_rate: int,
+        window_size: int,
+        frame_rate: int,
+        center: bool = True,
+        fmin: float = 50.0,
+        fmax: Optional[float] = None,
+    ):
+        super().__init__(sample_rate, window_size, frame_rate, center)
+        self.fmin = fmin
+        self.fmax = fmax if fmax is not None else float(sample_rate // 2)
+
+    def compute_feature(self, x: torch.Tensor) -> torch.Tensor:
+        # torchcrepe.predict returns (batch, n_frames) of f0 in Hz
+        # Use hop_length = hop_size and run on same device as input
+        f0 = torchcrepe.predict(
+            x,
+            self.sample_rate,
+            self.hop_size,
+            fmin=self.fmin,
+            fmax=self.fmax,
+            device=x.device,
+            pad=False,
+        )
+
+        # ensure shape (batch, n_frames, 1)
+        if f0.ndim == 2:
+            f0 = f0.unsqueeze(-1)
+        return f0
 
 
 class MFCC(Feature):

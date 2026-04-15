@@ -4,7 +4,7 @@ defaults:
   - _self_
   - data: default.yaml
   - ae: noiseband.yaml
-  - loss: mel.yaml
+  - loss: spec_mel.yaml
   - trainer: default.yaml
 
 name: null

@@ -20,6 +20,7 @@ dependencies = [
     "numpy<2.3.0",
     "rich",
     "setuptools<82",
+    "torchcrepe>=0.0.24",
 ]
 
 [tool.uv]
