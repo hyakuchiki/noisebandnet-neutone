@@ -32,17 +32,25 @@ class NBNStreaming(nn.Module):
     def forward(self, audio, centroid_shift, rand_amount, tilt_amount):
         feats = self.feat_proc(audio, self.sr)
         feats.update({"audio": audio})
-        # shift centroid
-        MAX_SHIFT = 48  # semitones
-        pshift = (centroid_shift - 0.5) * 2 * MAX_SHIFT  # -24~24
-        semishift = torch.round(pshift)
-        centroid_mult = 2 ** (semishift / 12)
-        feats["centroid"] *= centroid_mult
+        # determine number of frames from any time-feature (flexible for MFCC-only models)
+        # initialize as int to keep TorchScript types consistent
+        n_frames = 1
+        for v in feats.values():
+            if isinstance(v, torch.Tensor) and v.dim() >= 2:
+                # common feature shape: (batch, n_frames, ...)
+                n_frames = int(v.shape[1])
+                break
+        # shift centroid if present (some exported models use MFCCs and won't have centroid)
+        if "centroid" in feats:
+            MAX_SHIFT = 48  # semitones
+            pshift = (centroid_shift - 0.5) * 2 * MAX_SHIFT  # -24~24
+            semishift = torch.round(pshift)
+            centroid_mult = 2 ** (semishift / 12)
+            feats["centroid"] *= centroid_mult
         # encode
         enc_data = self.ae.encode(feats)
         amps = self.ae.decoder.infer(enc_data["z"])  # amps: batch, n_frames, n_banks
         # randomize amps
-        n_frames = feats["centroid"].shape[1]
         self.count -= n_frames
         N_FRAMES = 30
         if self.count <= 0:  # only change noise every N_FRAMES

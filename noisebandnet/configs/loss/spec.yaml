@@ -3,7 +3,7 @@ losses:
   modules:
     spec:
       _target_: noisebandnet.ddsp.losses.MultiSpecLoss
-      fft_sizes: [64, 128, 256, 512, 1024, 2048]
+      fft_sizes: [32, 128, 512, 1024, 2048, 4096, 8192]
       hop_lengths: null 
       win_lengths: null
       mag_w: 1.0

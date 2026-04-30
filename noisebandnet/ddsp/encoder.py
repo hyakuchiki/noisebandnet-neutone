@@ -25,10 +25,24 @@ class VolEncoder(nn.Module):
         self.encoder_dim = 1
 
     def forward(self, data: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        centroid = data["centroid"] / 8000.0
         vol = data["volume"]
         output = data.copy()
         output["enc_out"] = vol
+        return output
+
+
+class CentVolBandwidthEncoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder_dim = 3
+
+    def forward(self, data: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        centroid = data["centroid"] / 8000.0
+        vol = data["volume"]
+        bandwidth = data["bandwidth"] / 8000.0
+        enc_out = torch.cat([centroid, vol, bandwidth], dim=-1)
+        output = data.copy()
+        output["enc_out"] = enc_out
         return output
 
 

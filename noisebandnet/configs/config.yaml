@@ -4,12 +4,12 @@ defaults:
   - _self_
   - data: default.yaml
   - ae: noiseband.yaml
-  - loss: spec_mel.yaml
+  - loss: spec.yaml
   - trainer: default.yaml
 
 name: null
-sample_rate: 48000
-batch_size: 8
+sample_rate: 44100
+batch_size: 16
 seed: 0
 num_workers: 8
 ckpt: null # Used for resuming from checkpoint
