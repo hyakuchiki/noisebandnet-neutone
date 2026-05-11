@@ -2,8 +2,8 @@ _target_: noisebandnet.ddsp.data.SmallDataset
 
 raw_path: null
 sample_rate: ${sample_rate}
-length: 1.487
-frame_rate: 1378
+length: 1
+frame_rate: 500
 dataset_size: 6400
 feat_proc:
   _target_: noisebandnet.ddsp.features.FeatureProcessor

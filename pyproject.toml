@@ -39,3 +39,4 @@ include = ["noisebandnet*"]
 train = "noisebandnet.scripts.train:main"
 export-neutone = "noisebandnet.scripts.export:main"
 render-neutone = "noisebandnet.scripts.render:main"
+check-config = "noisebandnet.scripts.check_config:main"

@@ -1,0 +1,34 @@
+# Paper-style hyperparameters for NoiseBandNet (arXiv:2307.08007)
+defaults:
+  - data: default.yaml
+  - ae: noiseband.yaml
+  - loss: spec.yaml
+  - trainer: default.yaml
+  - _self_
+
+sample_rate: 44100
+batch_size: 16
+
+data:
+  # L_chunk = 65536 samples -> ~1.487s @ 44.1k
+  length: 1.487
+  # frame_rate ~= sample_rate // W (W=32) -> 44100 // 32 = 1378
+  frame_rate: 1378
+
+# Model / AE (place lr under `ae` and decoder under `ae.ae` so overrides merge correctly)
+ae:
+  lr: 1e-3
+  ae:
+    decoder:
+      n_banks: 2048
+      hidden_size: 128
+      n_splits: 32
+
+trainer:
+  max_steps: 10000
+
+loss:
+  losses:
+    modules:
+      spec:
+        fft_sizes: [32, 128, 512, 1024, 2048, 4096, 8192]

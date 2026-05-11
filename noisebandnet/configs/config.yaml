@@ -8,8 +8,8 @@ defaults:
   - trainer: default.yaml
 
 name: null
-sample_rate: 44100
-batch_size: 16
+sample_rate: 48000
+batch_size: 8
 seed: 0
 num_workers: 8
 ckpt: null # Used for resuming from checkpoint
