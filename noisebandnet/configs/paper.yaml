@@ -6,8 +6,14 @@ defaults:
   - trainer: default.yaml
   - _self_
 
+name: null
 sample_rate: 44100
 batch_size: 16
+seed: 0
+num_workers: 8
+ckpt: null # Used for resuming from checkpoint
+xfer_dir: assets
+save_last: true
 
 data:
   # L_chunk = 65536 samples -> ~1.487s @ 44.1k
@@ -32,3 +38,18 @@ loss:
     modules:
       spec:
         fft_sizes: [32, 128, 512, 1024, 2048, 4096, 8192]
+
+# Output directory
+hydra:
+  job:
+    chdir: true
+    config:
+      override_dirname:
+        kv_sep: "-"
+        item_sep: "_"
+  run:
+    dir: logs/${name}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: logs/${name}/multirun_${now:%Y-%m-%d_%H-%M-%S}
+    # subdir: ${hydra.job.override_dirname}
+    subdir: ${hydra.job.num}

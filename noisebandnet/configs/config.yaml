@@ -1,11 +1,11 @@
 # @package _global_
 
 defaults:
-  - _self_
   - data: default.yaml
   - ae: noiseband.yaml
   - loss: spec.yaml
   - trainer: default.yaml
+  - _self_
 
 name: null
 sample_rate: 48000
